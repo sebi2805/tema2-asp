@@ -52,18 +52,6 @@ int main(int argc, char *argv[]) {
             plim[i * extendedCols + (j)] = data[(i-1) * N + j-1];
         }
     }
-     FILE *out = fopen("plim_matrix.txt", "w");
-    if (out == NULL) {
-        printf("Eroare la deschiderea fisierului!\n");
-        return 1;
-    }
-    for (int i = 0; i < extendedRows; i++) {
-        for (int j = 0; j < extendedCols; j++) {
-            fprintf(out, "%f ", plim[i * extendedCols + j]);
-        }
-        fprintf(out, "\n");
-    }
-    fclose(out);
 
     // Iterarea algoritmului
     for (int iter = 0; iter < niter; iter++) {

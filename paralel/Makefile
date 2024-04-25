@@ -1,21 +1,28 @@
+# Definirea compilatorului
 CC=mpicc
+
+# Opțiuni de compilare, de exemplu -g pentru debug și -O2 pentru optimizare
 CFLAGS=-O2
-LDFLAGS=
-LIBS=
 
-TARGET=prog
-SRCS=main.c pgm_IO.c
-OBJS=$(SRCS:.c=.o)
+# Numele executabilului
+TARGET=program
 
+# Construiește ținta finală
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+# Link-ul final pentru executabil
+$(TARGET): main2.o pgm_IO.o
+	$(CC) -o $@ $^
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+# Regula pentru fișierele sursă
+main.o: main2.c pgm_IO.h
+	$(CC) $(CFLAGS) -c main.c
 
+pgm_IO.o: pgm_IO.c pgm_IO.h
+	$(CC) $(CFLAGS) -c pgm_IO.c
+
+# Curățarea proiectului
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(TARGET) *.o
 
 .PHONY: all clean
