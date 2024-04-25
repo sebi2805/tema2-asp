@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h> 
 #include "pgm_IO.h"  // Include header-ul pentru funcțiile de lucru cu fișiere PGM
 
 void initialize(float *array, int rows, int cols, float value);
@@ -12,7 +13,9 @@ int main(int argc, char *argv[]) {
     float *data, *pold, *pnew, *plim;
     int niter = 1;  // Numărul default de iterații
     char *filename = "image_640x480.pgm";  // Numele fișierului default
-
+clock_t start, end;  // Variabile pentru timp
+    double cpu_time_used;
+        start = clock();
     // Prelucrarea argumentelor liniei de comandă
     if (argc > 1) {
         niter = atoi(argv[1]);  // Primul argument este numărul de iterații
@@ -73,6 +76,9 @@ int main(int argc, char *argv[]) {
     free(plim);
     free(data);
 
+ end = clock();  // Sfârșitul măsurării timpului
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("Timpul de executie este: %f secunde.\n", cpu_time_used);
     return 0;
 }
 
