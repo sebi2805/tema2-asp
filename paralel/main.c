@@ -1,130 +1,7 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "pgm_IO.h"  // Include header-ul pentru funcțiile de lucru cu fișiere PGM
-
-void initialize(float *array, int rows, int cols, float value);
-void updateImage(float *pold, float *pnew, float *plim, int rows, int cols);
-void copyWithoutHalo(float *src, float *dest, int rows, int cols) ;
-
-int main(int argc, char *argv[]) {
-    int M, N;  // Dimensiunile imaginii
-    float *data, *pold, *pnew, *plim;
-    int niter = 10;  // Numărul default de iterații
-    char *filename = "image_640x480.pgm";  // Numele fișierului default
-    int rank, nprocs;  // Rank-ul procesului curent și numărul total de procese
-    int MP, NP;  // Dimensiunile per proces
-
-    // Initialize MPI
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    // Prelucrarea argumentelor liniei de comandă
-    if (argc > 1) {
-        niter = atoi(argv[1]);  // Primul argument este numărul de iterații
-        if (argc > 2) {
-            filename = argv[2];  // Al doilea argument este numele fișierului
-        }
-    }
-
-    // Only the master process reads the size of the image
-    if (rank == 0) {
-        // Citirea dimensiunilor imaginii din fișier
-        pgm_size(filename, &M, &N);
-    }
-
-    // Broadcast the dimensions to all processes
-    MPI_Bcast(&M, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    // Calculate local dimensions assuming M is divisible by nprocs
-    MP = M / nprocs;
-    NP = N;
-
-    // Allocate memory for local buffers including the halo
-    int extendedRows = MP + 2;
-    int extendedCols = NP + 2;
-
-    pold = (float*)malloc(extendedRows * extendedCols * sizeof(float));
-    pnew = (float*)malloc(extendedRows * extendedCols * sizeof(float));
-    plim = (float*)malloc(extendedRows * extendedCols * sizeof(float));
-    data = (float*)malloc(MP * NP * sizeof(float));  // Only the core part without halo
-
-    if (!pold || !pnew || !plim || !data) {
-        fprintf(stderr, "Error in memory allocation\n");
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
-
-    // Initialize matrices with some default values (e.g., 255)
-    initialize(pold, extendedRows, extendedCols, 255.0f);
-    initialize(pnew, extendedRows, extendedCols, 255.0f);
-    initialize(plim, extendedRows, extendedCols, 255.0f);
-
-    // Rest of the program (scatter, compute, gather, etc.)
-    if (rank == 0) {
-    // Citirea datelor imaginii în 'data' principal
-    pgm_read(filename, data, M, N);  // Se presupune că data este suficient de mare pentru a ține întreaga imagine
-}
-
-// Distribuția segmentelor de imagine către fiecare proces
-MPI_Scatter(data, MP * NP, MPI_FLOAT, 
-            pold + extendedCols + 1, // Offset pentru a lăsa spațiu pentru halo
-            MP * NP, MPI_FLOAT, 
-            0, MPI_COMM_WORLD);
-            // Exemplu de actualizare a halo-urilor laterale
-// Trimiterea și primirea coloanelor de margine
-float* send_right = (float*)malloc((MP + 2) * sizeof(float)); // Buffer pentru coloana dreaptă
-float* recv_left = (float*)malloc((MP + 2) * sizeof(float));  // Buffer pentru coloana stângă
-
-// Copiem coloana dreaptă în buffer-ul de trimitere
-for (int i = 0; i < MP + 2; i++) {
-    send_right[i] = pold[i * extendedCols + NP];  // ultima coloană validă
-}
-
-// Send to right, receive from left
-MPI_Sendrecv(send_right, MP + 2, MPI_FLOAT, (rank + 1) % nprocs, 0,
-             recv_left, MP + 2, MPI_FLOAT, (rank - 1 + nprocs) % nprocs, 0,
-             MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-// Actualizăm coloana stângă de halo cu datele primite
-for (int i = 0; i < MP + 2; i++) {
-    pold[i * extendedCols] = recv_left[i];
-}
-
-// Similar, actualizările pentru celelalte halo-uri
-
-free(send_right);
-free(recv_left);
-// Procesarea locală a imaginii
-// (Implementează logica specifică aici)
-   for (int iter = 0; iter < niter; iter++) {
-        updateImage(pold, pnew, plim, extendedRows, extendedCols);
-        copyWithoutHalo(pnew, pold, extendedRows, extendedCols);
-    }
-// Colectarea datelor procesate înapoi la procesul principal
-MPI_Gather(pnew + extendedCols + 1, MP * NP, MPI_FLOAT,
-           data, MP * NP, MPI_FLOAT,
-           0, MPI_COMM_WORLD);
-
-if (rank == 0) {
-    // Procesul principal poate acum rescrie imaginea procesată înapoi într-un fișier
-    pgm_write("processed_image.pgm", data, M, N);
-}
-
-    // Finalize MPI
-    MPI_Finalize();
-
-    return 0;
-}
-
-void initialize(float *array, int rows, int cols, float value) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            array[i * cols + j] = value;
-        }
-    }
-}
+#include "pgm_IO.h"  // Asigură-te că acest header este configurat pentru a lucra cu MPI
 void updateImage(float *pold, float *pnew, float *plim, int rows, int cols) {
     for (int i = 1; i < rows ; i++) {
         for (int j = 1; j < cols ; j++) {
@@ -133,8 +10,129 @@ void updateImage(float *pold, float *pnew, float *plim, int rows, int cols) {
         }
     }
 }
+
 void copyWithoutHalo(float *src, float *dest, int rows, int cols) {
     for (int i = 1; i < rows ; i++) {
       memcpy(dest + i * cols + 1, src + i * cols + 1, (cols - 2) * sizeof(float));
     }
+}
+
+
+int main(int argc, char *argv[]) {
+    MPI_Init(&argc, &argv);
+
+    int rank, nproc;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+
+    int M, N;  // Dimensiuni totale ale imaginii
+    if (rank == 0) {
+        pgm_size("image_640x480.pgm", &M, &N);
+    }
+
+    // Distribuie dimensiunile la toate procesele
+    MPI_Bcast(&M, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    int MP = M / nproc;  // Segmentul de rânduri alocat fiecărui proces
+    int NP = N;          // Toate coloanele sunt procesate de fiecare proces
+    float *masterdata = NULL;
+   if (argc != 2) {
+        if (rank == 0) {
+            printf("Utilizare: %s numar_de_iteratii\n", argv[0]);
+        }
+        MPI_Finalize();
+        return 1;
+    }
+
+    // Convertim al doilea argument într-un întreg pentru a obține numărul de iterații
+    int niter = atoi(argv[1]);
+  
+    float (*pold) = malloc((MP + 2) * (NP + 2) * sizeof(float));
+    float (*pnew) = malloc((MP + 2) * (NP + 2) * sizeof(float));
+    float (*plim) = malloc((MP + 2) * (NP + 2) * sizeof(float));
+    float (*data) = malloc(MP * NP * sizeof(float));
+
+    if (!pold || !pnew || !plim || !data) {
+        printf("Eroare la alocarea memoriei.\n");
+        MPI_Abort(MPI_COMM_WORLD, -1);
+        MPI_Finalize();
+        return -1;
+    }
+
+    for (int i = 0; i < MP + 2; i++) {
+        for (int j = 0; j < NP + 2; j++) {
+            int index = i * (NP + 2) + j;  // Calculul indexului pentru array-ul unidimensional
+            pold[index] = 255.0f;  // Inițializarea la 255.0f
+            pnew[index] = 255.0f;  // Inițializarea la 255.0f
+            plim[index] = 255.0f;  // Inițializarea la 255.0f
+        }
+    }
+
+    // Citirea și distribuția datelor din imagine
+   if (rank == 0) {
+        masterdata = malloc(M * N * sizeof(float));  // Doar procesul master alocă memoria pentru întreaga imagine
+        pgm_read("image_640x480.pgm", masterdata, M, N);
+    }
+
+    // Utilizarea MPI_Scatter pentru a distribui datele
+    MPI_Scatter(masterdata, MP * NP, MPI_FLOAT, data, MP * NP, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+
+    // Copiem 'data' în 'plim', respectând indexarea corectă și păstrând halo-ul la 255
+ for (int i = 1; i <= MP; i++) {
+    for (int j = 1; j <= NP; j++) {
+        // Calcularea indexului în array-ul unidimensional
+        int index_plim = (i * (NP + 2)) + j; // NP + 2 pentru că avem un halo de 1 element pe fiecare latură
+        int index_data = ((i - 1) * NP) + (j - 1);
+
+        // Copierea valorilor
+        plim[index_plim] = data[index_data];
+    }
+}
+
+    int iter;
+    MPI_Status status;
+
+    for (iter = 0; iter < niter; iter++) {
+    // Halo exchange
+    if (rank > 0) {  // Nu primul proces
+        MPI_Sendrecv(pold + (1 * (NP + 2) + 1), NP, MPI_FLOAT, rank - 1, 0,
+                     pold + (0 * (NP + 2) + 1), NP, MPI_FLOAT, rank - 1, 1, MPI_COMM_WORLD, &status);
+    }
+    if (rank < nproc - 1) {  // Nu ultimul proces
+        MPI_Sendrecv(pold + (MP * (NP + 2) + 1), NP, MPI_FLOAT, rank + 1, 1,
+                     pold + ((MP + 1) * (NP + 2) + 1), NP, MPI_FLOAT, rank + 1, 0, MPI_COMM_WORLD, &status);
+    }
+
+    // Aplicați algoritmul de reconstrucție pe datele locale
+    updateImage(pold, pnew, plim, MP + 2, NP + 2);
+
+    // Copiați rezultatele în pold pentru următoarea iterație
+    copyWithoutHalo(pnew, pold, MP + 2, NP + 2);
+}
+
+// După ultima iterație, copiați datele finale procesate în 'data'
+for (int i = 1; i <= MP; i++) {
+    for (int j = 1; j <= NP; j++) {
+        int index_data = ((i - 1) * NP) + (j - 1);
+        int index_pold = (i * (NP + 2)) + j;
+        data[index_data] = pnew[index_pold];
+    }
+}
+
+// Colectarea datelor procesate de la toate procesele în masterdata
+    MPI_Gather(data, MP * NP, MPI_FLOAT, masterdata, MP * NP, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    // Procesul master scrie imaginea finală
+    if (rank == 0) {
+        pgm_write("processed_image1.pgm", masterdata, M, N);
+        free(masterdata);
+    }
+
+    free(data);
+
+    // Restul procesării și MPI_Finalize
+    MPI_Finalize();
+    return 0;
 }

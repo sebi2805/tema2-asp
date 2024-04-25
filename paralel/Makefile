@@ -11,11 +11,11 @@ TARGET=program
 all: $(TARGET)
 
 # Link-ul final pentru executabil
-$(TARGET): main2.o pgm_IO.o
+$(TARGET): main.o pgm_IO.o
 	$(CC) -o $@ $^
 
 # Regula pentru fișierele sursă
-main.o: main2.c pgm_IO.h
+main.o: main.c pgm_IO.h
 	$(CC) $(CFLAGS) -c main.c
 
 pgm_IO.o: pgm_IO.c pgm_IO.h
