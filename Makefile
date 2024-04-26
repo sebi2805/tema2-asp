@@ -5,7 +5,7 @@ CFLAGS=-Wall -lm
 TARGET=reconstruct
 
 # Toate fișierele sursă
-SOURCES=main-seq2.c pgm_IO.c
+SOURCES=main-seq.c pgm_IO.c
 HEADERS=pgm_IO.h
 
 # Obiectele corespunzătoare surselor
